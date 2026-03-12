@@ -1,591 +1,523 @@
-import { useEffect, useRef, useState } from "react";
-import Icon from "@/components/ui/icon";
+import { useState } from "react";
 
-const HERO_IMG = "https://cdn.poehali.dev/projects/6eaec7a6-a363-4c65-a5d5-2508d509e0f6/files/5d540144-7ba4-435e-9d90-e81b73816598.jpg";
+const PURPOSE_TEXT =
+  "Добровольное пожертвование на уставную деятельность АНО содействия сохранению исторического наследия и патриотического воспитания «ПАТРИОТ ДВ», ИНН 2502079223, ОГРН 1242500028583. НДС не облагается.";
 
-function useInView(threshold = 0.15) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setInView(true); obs.disconnect(); } },
-      { threshold }
-    );
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return { ref, inView };
+const AMOUNT_DESCS: Record<string, string> = {
+  "100 ₽": "100 ₽ — метр ткани для маскировочного изделия",
+  "300 ₽": "300 ₽ — расходные материалы для одного занятия в мастерской",
+  "500 ₽": "500 ₽ — тёплые вещи для одной гуманитарной посылки",
+  "1 000 ₽": "1 000 ₽ — полная комплектация одной посылки с вещами первой необходимости",
+  "Своя": "Любая сумма имеет значение и будет направлена на уставную деятельность",
+};
+
+const FAQS = [
+  { q: "Нет опыта — можно прийти?", a: "Да, и именно таких участников мы ждём. Опыт не нужен совсем — всему обучим прямо на месте. Приходите — уже через час будете делать что-то полезное." },
+  { q: "Я живу не в Артёме — могу помочь?", a: "Конечно. Мы работаем по всему Приморскому краю — Владивосток, Уссурийск, Находка и другие города. Также можно помочь дистанционно: передать материалы или стать инфопартнёром из любого города." },
+  { q: "Сколько времени нужно уделять?", a: "Достаточно 2–3 часов в неделю — или даже разово, если удобно именно так. Мы подберём формат под ваш график. Главное — желание помочь." },
+  { q: "Можно прийти с детьми?", a: "Да, и это очень приветствуется. Участие детей в совместных делах — лучший урок патриотического воспитания. Дети занимаются рядом со взрослыми, ветеранами, ровесниками." },
+  { q: "Как я узнаю, что помощь дошла?", a: "Публикуем подробные фото- и видеоотчёты после каждой передачи. Все отчёты доступны в открытом доступе в нашем сообществе ВКонтакте. Можете проверить сами — ничего скрывать не нужно." },
+  { q: "Безопасно ли делать финансовый перевод?", a: "АНО «ПАТРИОТ ДВ» — официально зарегистрированная некоммерческая организация, ОГРН 1242500028583, ИНН 2502079223. Финансовая отчётность публикуется в соответствии с требованиями законодательства РФ. Вы вправе запросить подтверждение о принятии пожертвования." },
+  { q: "Мы — организация. Как можно сотрудничать?", a: "Рады партнёрству со школами, спортивными клубами, предприятиями и общественными организациями Приморского края. Проведём урок мужества, патриотический турнир или совместную акцию — бесплатно, с полной подготовкой с нашей стороны. Заполните форму выше и выберите «Партнёрство»." },
+];
+
+function copyText(text: string, setCopied: (v: boolean) => void) {
+  navigator.clipboard.writeText(text).then(() => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }).catch(() => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  });
 }
 
-function AnimSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
-  const { ref, inView } = useInView();
+function CopyBtn({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
   return (
-    <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? "translateY(0)" : "translateY(32px)",
-        transition: `opacity 0.7s ease ${delay}ms, transform 0.7s ease ${delay}ms`,
-      }}
-    >
-      {children}
+    <button className="p-copy-btn" onClick={() => copyText(text, setCopied)}>
+      {copied ? "✅ Скопировано" : label}
+    </button>
+  );
+}
+
+function FaqItem({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`p-faq-item${open ? " open" : ""}`}>
+      <button className="p-faq-q" onClick={() => setOpen(!open)}>
+        {q}
+        <span className="p-faq-arrow">▾</span>
+      </button>
+      {open && <div className="p-faq-a">{a}</div>}
     </div>
   );
 }
 
-const stats = [
-  { v: "120+", l: "волонтёров" },
-  { v: "40+", l: "акций проведено" },
-  { v: "15+", l: "школ-партнёров" },
-];
-
-const pillars = [
-  { i: "📜", t: "Историческая память", d: "Проекты со школами, музеями и ветеранскими организациями Приморья." },
-  { i: "🎖", t: "Патриотическое воспитание", d: "Уроки мужества, встречи с ветеранами, турниры. Бесплатно." },
-  { i: "🤝", t: "Поддержка служащих", d: "Гуманитарные акции, мастерские, помощь семьям военнослужащих." },
-  { i: "👨‍👩‍👧", t: "Единство поколений", d: "Школьники, пенсионеры и предприниматели за одним столом." },
-];
-
-const steps = [
-  { n: 1, t: "Определяем приоритеты", d: "Воспитательные программы, историческая память, поддержка ветеранов." },
-  { n: 2, t: "Привлекаем участников", d: "Волонтёры, школы, предприятия Приморского края." },
-  { n: 3, t: "Реализуем вместе", d: "Акции, уроки мужества, культурные мероприятия." },
-  { n: 4, t: "Публикуем отчёт", d: "Фото, видео, цифры — в открытом доступе." },
-];
-
-const directions = [
-  { i: "🙌", t: "Прийти лично", d: "Плетение сетей, упаковка посылок. Без опыта, можно с детьми.", cta: "Узнать адрес" },
-  { i: "📦", t: "Передать материалы", d: "Ткань, вещи, транспорт. Из любого города Приморья.", cta: "Список нужд" },
-  { i: "🏫", t: "Школам и организациям", d: "Проведём урок мужества или турнир. Полностью бесплатно.", cta: "Стать партнёром" },
-  { i: "📢", t: "Инфоподдержка", d: "Для блогеров и жителей Приморского края.", cta: "Написать нам" },
-];
-
-const faqs = [
-  { q: "Нет опыта — можно прийти?", a: "Да. Всему обучим на месте. Важно только желание помочь." },
-  { q: "Живу не в Артёме?", a: "Работаем по всему Приморью. Можно помочь дистанционно." },
-  { q: "Сколько времени нужно?", a: "2–3 часа в неделю или разово — подберём удобный формат." },
-  { q: "Можно прийти с детьми?", a: "Да. Дети участвуют рядом со взрослыми и ветеранами." },
-  { q: "Как узнаю, что помощь дошла?", a: "Публикуем фото- и видеоотчёты в группе ВКонтакте." },
-  { q: "Безопасно ли переводить деньги?", a: "Да. Официальная НКО, ОГРН 1242500028583. Финотчётность открыта." },
-];
-
-const navLinks = [
-  { l: "Главная", to: "#hero" },
-  { l: "О миссии", to: "#mission" },
-  { l: "Как помочь", to: "#dir" },
-  { l: "Контакты", to: "#footer" },
-];
-
 export default function Index() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [formData, setFormData] = useState({ name: "", contact: "", city: "", format: "", agree: false });
-  const [submitted, setSubmitted] = useState(false);
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [activeAmount, setActiveAmount] = useState("500 ₽");
+  const [agreed, setAgreed] = useState(false);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const handleSubmit = (e: React.FormEvent) => {
+  function handleForm(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
-  };
+    setFormSubmitted(true);
+  }
 
   return (
-    <div className="min-h-screen bg-patriot-dark font-golos text-white overflow-x-hidden">
-
-      {/* NAV */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-patriot-dark/95 backdrop-blur-md shadow-lg shadow-black/30" : "bg-transparent"}`}>
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <a href="#hero" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-patriot-red to-patriot-gold flex items-center justify-center text-sm font-bold font-oswald">ПДВ</div>
-            <span className="font-oswald font-bold text-lg tracking-wide hidden sm:block">ПАТРИОТ ДВ</span>
-          </a>
-
-          <div className="hidden md:flex items-center gap-8">
-            {navLinks.map(nl => (
-              <a key={nl.l} href={nl.to} className="text-sm text-white/70 hover:text-white transition-colors duration-200 font-medium tracking-wide">
-                {nl.l}
-              </a>
-            ))}
+    <>
+      {/* ── HEADER ── */}
+      <header className="p-header">
+        <div className="p-container">
+          <div className="p-header-inner">
+            <div className="p-logo-block">
+              <div className="p-logo-icon">🛡</div>
+              <div className="p-logo-text">
+                <strong>ПАТРИОТ ДВ</strong>
+                <span>АНО · Приморский край</span>
+              </div>
+            </div>
+            <div className="p-header-trust">
+              <strong>🔒 Официальная организация</strong><br />
+              ОГРН 1242500028583 · ИНН 2502079223
+            </div>
           </div>
-
-          <a href="#form" className="hidden md:flex items-center gap-2 bg-patriot-red hover:bg-patriot-red-dark text-white text-sm font-semibold px-5 py-2.5 rounded-lg btn-glow transition-all duration-300">
-            Хочу участвовать
-          </a>
-
-          <button className="md:hidden text-white/80 hover:text-white" onClick={() => setMenuOpen(!menuOpen)}>
-            <Icon name={menuOpen ? "X" : "Menu"} size={24} />
-          </button>
         </div>
+      </header>
 
-        {menuOpen && (
-          <div className="md:hidden bg-patriot-dark-2/98 backdrop-blur-md border-t border-white/10 px-6 py-4 flex flex-col gap-4">
-            {navLinks.map(nl => (
-              <a key={nl.l} href={nl.to} className="text-white/80 hover:text-white py-1 transition-colors" onClick={() => setMenuOpen(false)}>
-                {nl.l}
-              </a>
-            ))}
-            <a href="#form" className="bg-patriot-red text-white text-sm font-semibold px-5 py-3 rounded-lg text-center mt-2" onClick={() => setMenuOpen(false)}>
-              Хочу участвовать
-            </a>
-          </div>
-        )}
-      </nav>
-
-      {/* HERO */}
-      <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0">
-          <img src={HERO_IMG} alt="Владивосток" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-b from-patriot-dark/70 via-patriot-dark/60 to-patriot-dark" />
-          <div className="absolute inset-0 bg-gradient-to-r from-patriot-dark/60 via-transparent to-transparent" />
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-24 pb-20 grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 bg-patriot-red/20 border border-patriot-red/40 text-patriot-gold text-xs font-semibold px-4 py-2 rounded-full mb-6 animate-fade-in">
-              <span className="w-1.5 h-1.5 bg-patriot-gold rounded-full animate-pulse" />
-              Официальная НКО · Приморский край · ОГРН 1242500028583
+      {/* ── HERO ── */}
+      <section className="p-hero">
+        <div className="p-container">
+          <div className="p-hero-inner">
+            <div>
+              <div className="p-hero-badge">
+                <span>●</span> Работаем по всему Приморскому краю
+              </div>
+              <h1>
+                Каждый житель Приморья<br />
+                может сделать <em>что-то конкретное</em><br />
+                для тех, кто служит Родине
+              </h1>
+              <p className="p-hero-sub">
+                АНО «ПАТРИОТ ДВ» — официальная некоммерческая организация Приморского края.
+                Содействуем сохранению исторического и культурного наследия, патриотическому
+                воспитанию молодёжи и поддержке тех, кто служит Отечеству.
+              </p>
+              <div className="p-hero-hook">
+                «За одним столом плетут маскировочные сети школьники, ветераны и
+                предприниматели — каждое изделие уходит с сигналом: о вас помнят, вы не одни.»
+              </div>
+              <div className="p-hero-stats">
+                <div className="p-stat-item">
+                  <span className="p-stat-num">120+</span>
+                  <span className="p-stat-label">волонтёров в крае</span>
+                </div>
+                <div className="p-stat-item">
+                  <span className="p-stat-num">40+</span>
+                  <span className="p-stat-label">акций проведено</span>
+                </div>
+                <div className="p-stat-item">
+                  <span className="p-stat-num">15+</span>
+                  <span className="p-stat-label">школ-партнёров</span>
+                </div>
+                <div className="p-stat-item">
+                  <span className="p-stat-num">2024</span>
+                  <span className="p-stat-label">год основания</span>
+                </div>
+              </div>
+              <div className="p-btn-group">
+                <a href="#form" className="p-btn p-btn-primary">Хочу участвовать →</a>
+                <a href="#directions" className="p-btn p-btn-outline">Как могу помочь</a>
+              </div>
             </div>
 
-            <h1 className="font-oswald text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6 animate-fade-up">
-              Каждый может сделать{" "}
-              <span className="text-gradient-gold">что-то конкретное</span>{" "}
-              для тех, кто служит Родине
-            </h1>
-
-            <p className="text-white/70 text-lg leading-relaxed mb-8 animate-fade-up animate-delay-200">
-              Сохраняем историческое наследие, воспитываем молодёжь, поддерживаем тех, кто служит Отечеству.
-              За одним столом — школьники, ветераны и предприниматели.
-            </p>
-
-            <div className="flex flex-wrap gap-4 mb-12 animate-fade-up animate-delay-300">
-              <a href="#form" className="bg-patriot-red hover:bg-patriot-red-dark text-white font-bold px-8 py-4 rounded-xl text-base btn-glow transition-all duration-300 flex items-center gap-2">
-                Хочу участвовать
-                <Icon name="ArrowRight" size={18} />
-              </a>
-              <a href="#dir" className="border border-white/30 hover:border-white/60 text-white/90 hover:text-white font-semibold px-8 py-4 rounded-xl text-base transition-all duration-300">
-                Как помочь
-              </a>
+            {/* HERO FORM */}
+            <div className="p-hero-card" id="form">
+              <h3>Выберите удобный формат участия</h3>
+              <p>Заполните форму — свяжемся в течение рабочего дня и всё объясним</p>
+              {formSubmitted ? (
+                <div style={{ textAlign: "center", padding: "24px 0" }}>
+                  <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>✅</div>
+                  <h3 style={{ color: "#4CAF50", marginBottom: "8px" }}>Заявка отправлена!</h3>
+                  <p style={{ color: "var(--muted-c)", fontSize: "0.9rem" }}>Свяжемся в течение рабочего дня</p>
+                </div>
+              ) : (
+                <form onSubmit={handleForm}>
+                  <div className="p-form-group">
+                    <label>Ваше имя</label>
+                    <input type="text" placeholder="Как к вам обращаться?" required />
+                  </div>
+                  <div className="p-form-group">
+                    <label>Телефон или ник ВКонтакте</label>
+                    <input type="text" placeholder="+7 (___) ___-__-__ или @nik" required />
+                  </div>
+                  <div className="p-form-group">
+                    <label>Город / район Приморья</label>
+                    <input type="text" placeholder="Артём, Владивосток, Уссурийск…" />
+                  </div>
+                  <div className="p-form-group">
+                    <label>Как хотите участвовать?</label>
+                    <select defaultValue="">
+                      <option value="">— выберите вариант —</option>
+                      <option>Прийти лично — плести, собирать, помогать</option>
+                      <option>Передать материалы или вещи</option>
+                      <option>Школа / клуб / организация (партнёрство)</option>
+                      <option>Информационная поддержка</option>
+                      <option>Финансовая помощь</option>
+                      <option>Ещё не решил(а) — расскажите подробнее</option>
+                    </select>
+                  </div>
+                  <div className="p-check-row">
+                    <input
+                      type="checkbox"
+                      id="pd"
+                      required
+                      checked={agreed}
+                      onChange={e => setAgreed(e.target.checked)}
+                    />
+                    <label htmlFor="pd">
+                      Согласен(а) на обработку персональных данных. Контакты не передаются третьим лицам.
+                    </label>
+                  </div>
+                  <button type="submit" className="p-btn p-btn-primary p-btn-full">
+                    Отправить заявку
+                  </button>
+                  <div className="p-form-hint">🔒 Данные защищены · Ответим в течение дня</div>
+                </form>
+              )}
             </div>
+          </div>
+        </div>
+      </section>
 
-            <div className="grid grid-cols-3 gap-6 animate-fade-up animate-delay-400">
-              {stats.map((s, i) => (
-                <div key={i} className="text-center">
-                  <div className="font-oswald text-3xl sm:text-4xl font-bold text-gradient-gold">{s.v}</div>
-                  <div className="text-white/50 text-xs mt-1 uppercase tracking-wider">{s.l}</div>
+      {/* ── MISSION ── */}
+      <section className="p-section">
+        <div className="p-container">
+          <div className="p-mission-grid">
+            <div className="p-mission-text">
+              <span className="p-section-label">Наша миссия</span>
+              <h2>Содействие сохранению исторического и культурного наследия Приморья</h2>
+              <p>
+                Мы убеждены: любовь к Родине — это не лозунг, а ежедневные действия.
+                АНО «ПАТРИОТ ДВ» создаёт условия, в которых каждый житель Приморского края
+                может стать частью живой истории своей страны.
+              </p>
+              <p>
+                Работаем с детьми и молодёжью, ветеранами, школами, предприятиями и
+                общественными организациями — от Артёма до самых отдалённых районов
+                Приморского края.
+              </p>
+              <p style={{ fontSize: "0.82rem", color: "var(--muted-c)" }}>
+                Организация официально зарегистрирована и действует в соответствии с Уставом
+                и законодательством Российской Федерации.<br />
+                <strong>ОГРН 1242500028583 · ИНН 2502079223</strong>
+              </p>
+            </div>
+            <div className="p-mission-pillars">
+              {[
+                { i: "📜", t: "Историческая и культурная память", d: "Совместные проекты со школами, музеями и ветеранскими организациями края. Живое слово, а не только учебники." },
+                { i: "🎖", t: "Патриотическое воспитание молодёжи", d: "Уроки мужества, встречи с ветеранами, турниры и акции по всему Приморскому краю. Бесплатно для школ." },
+                { i: "🤝", t: "Поддержка тех, кто служит Отечеству", d: "Гуманитарные акции, волонтёрские мастерские, адресная помощь военнослужащим и их семьям." },
+                { i: "👨‍👩‍👧‍👦", t: "Межпоколенческое единство", d: "За одним столом — школьники, пенсионеры и предприниматели. Преемственность поколений как живая традиция." },
+              ].map((p, i) => (
+                <div key={i} className="p-pillar">
+                  <div className="p-pillar-icon">{p.i}</div>
+                  <div>
+                    <h4>{p.t}</h4>
+                    <p>{p.d}</p>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-
-          <div className="hidden lg:flex justify-end">
-            <div className="relative">
-              <div className="w-72 h-72 rounded-full bg-gradient-to-br from-patriot-red/30 to-patriot-gold/20 blur-3xl absolute -inset-8" />
-              <div className="relative bg-patriot-dark-3/80 backdrop-blur border border-white/10 rounded-2xl p-6 space-y-4 w-72">
-                <div className="flex items-center gap-3 pb-4 border-b border-white/10">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-patriot-red to-patriot-gold flex items-center justify-center text-lg">🎖</div>
-                  <div>
-                    <div className="font-semibold text-sm">АНО «ПАТРИОТ ДВ»</div>
-                    <div className="text-white/40 text-xs">г. Артём, Приморский край</div>
-                  </div>
-                </div>
-                {[
-                  { i: "Phone", t: "+7-908-451-53-85" },
-                  { i: "Globe", t: "vk.com/patriotdv" },
-                  { i: "Shield", t: "ИНН 2502079223" },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center gap-3 text-sm">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-patriot-gold">
-                      <Icon name={r.i as "Phone"} size={14} />
-                    </div>
-                    <span className="text-white/70">{r.t}</span>
-                  </div>
-                ))}
-                <div className="pt-2">
-                  <div className="bg-patriot-red/10 border border-patriot-red/20 rounded-lg px-4 py-2 text-center text-xs text-patriot-gold font-medium">
-                    Отчётность открыта · НДС не облагается
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <Icon name="ChevronDown" size={28} className="text-white/30" />
         </div>
       </section>
 
-      {/* MISSION */}
-      <section id="mission" className="py-24 bg-patriot-dark-2 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1/2 h-px bg-gradient-to-r from-transparent via-patriot-red/50 to-transparent" />
-        <div className="max-w-7xl mx-auto px-6">
-          <AnimSection className="text-center mb-16">
-            <div className="inline-block text-xs font-semibold text-patriot-gold uppercase tracking-widest mb-4 border border-patriot-gold/30 px-4 py-1.5 rounded-full">
-              О миссии
-            </div>
-            <h2 className="font-oswald text-4xl lg:text-5xl font-bold text-white mb-4">
-              Содействие сохранению<br />
-              <span className="text-gradient-gold">исторического наследия</span> Приморья
-            </h2>
-            <p className="text-white/50 text-lg max-w-2xl mx-auto">
-              Мы объединяем жителей Приморского края вокруг общих ценностей — памяти, чести и взаимопомощи.
-            </p>
-          </AnimSection>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {pillars.map((p, i) => (
-              <AnimSection key={i} delay={i * 100}>
-                <div className="bg-patriot-dark-3 border border-white/5 hover:border-patriot-red/30 rounded-2xl p-6 h-full card-hover transition-all duration-300">
-                  <div className="text-4xl mb-4">{p.i}</div>
-                  <h3 className="font-oswald text-xl font-bold text-white mb-3">{p.t}</h3>
-                  <p className="text-white/50 text-sm leading-relaxed">{p.d}</p>
-                </div>
-              </AnimSection>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section className="py-24 bg-patriot-dark relative">
-        <div className="max-w-7xl mx-auto px-6">
-          <AnimSection className="text-center mb-16">
-            <div className="inline-block text-xs font-semibold text-patriot-gold uppercase tracking-widest mb-4 border border-patriot-gold/30 px-4 py-1.5 rounded-full">
-              Как мы работаем
-            </div>
-            <h2 className="font-oswald text-4xl lg:text-5xl font-bold text-white">
-              От идеи до <span className="text-gradient-red">результата</span>
-            </h2>
-          </AnimSection>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {steps.map((s, i) => (
-              <AnimSection key={i} delay={i * 120}>
-                <div className="relative">
-                  {i < steps.length - 1 && (
-                    <div className="hidden lg:block absolute top-8 left-full w-full h-px bg-gradient-to-r from-patriot-red/40 to-transparent z-0 -translate-y-px" />
-                  )}
-                  <div className="relative z-10">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-patriot-red to-patriot-red-dark flex items-center justify-center font-oswald text-2xl font-bold text-white mb-5 shadow-lg shadow-patriot-red/20">
-                      {s.n}
-                    </div>
-                    <h3 className="font-oswald text-xl font-bold text-white mb-3">{s.t}</h3>
-                    <p className="text-white/50 text-sm leading-relaxed">{s.d}</p>
-                  </div>
-                </div>
-              </AnimSection>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* DIRECTIONS */}
-      <section id="dir" className="py-24 bg-patriot-dark-2 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(200,16,46,0.08)_0%,_transparent_60%)]" />
-        <div className="max-w-7xl mx-auto px-6 relative">
-          <AnimSection className="text-center mb-16">
-            <div className="inline-block text-xs font-semibold text-patriot-gold uppercase tracking-widest mb-4 border border-patriot-gold/30 px-4 py-1.5 rounded-full">
-              Как помочь
-            </div>
-            <h2 className="font-oswald text-4xl lg:text-5xl font-bold text-white mb-4">
-              Выберите удобный<br />
-              <span className="text-gradient-gold">формат участия</span>
-            </h2>
-            <p className="text-white/50 text-lg max-w-xl mx-auto">
-              Каждый вклад важен — неважно, сколько у вас времени или возможностей.
-            </p>
-          </AnimSection>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {directions.map((d, i) => (
-              <AnimSection key={i} delay={i * 100}>
-                <div className="group bg-patriot-dark-3 border border-white/5 hover:border-patriot-red/30 rounded-2xl p-6 h-full card-hover flex flex-col">
-                  <div className="text-4xl mb-4">{d.i}</div>
-                  <h3 className="font-oswald text-xl font-bold text-white mb-3">{d.t}</h3>
-                  <p className="text-white/50 text-sm leading-relaxed flex-1 mb-6">{d.d}</p>
-                  <a
-                    href="#form"
-                    className="w-full text-center border border-patriot-red/40 hover:bg-patriot-red hover:border-patriot-red text-patriot-red hover:text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-all duration-300"
-                  >
-                    {d.cta} →
-                  </a>
-                </div>
-              </AnimSection>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* STORIES */}
-      <section className="py-24 bg-patriot-dark relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(212,160,23,0.05)_0%,_transparent_70%)]" />
-        <div className="max-w-7xl mx-auto px-6">
-          <AnimSection className="text-center mb-16">
-            <h2 className="font-oswald text-4xl lg:text-5xl font-bold text-white">
-              О вас помнят.{" "}
-              <span className="text-gradient-gold">Вы не одни.</span>
-            </h2>
-          </AnimSection>
-          <div className="grid md:grid-cols-3 gap-6">
+      {/* ── STATS BAR ── */}
+      <div className="p-stats-bar">
+        <div className="p-container">
+          <div className="p-stats-inner">
             {[
-              { i: "🎖", t: "Ветераны Приморья", q: "Когда слышишь от живого человека — совсем другое." },
-              { i: "🧵", t: "Школьники в мастерской", q: "Я не знала, что умею что-то важное. Теперь знаю." },
-              { i: "❤️", t: "Семьи военнослужащих", q: "Знать, что тебя не забыли — это уже много." },
+              { n: "120+", l: "Волонтёров по Приморью" },
+              { n: "40+", l: "Проведённых акций" },
+              { n: "15+", l: "Школ и клубов-партнёров" },
+              { n: "100%", l: "Открытая отчётность" },
             ].map((s, i) => (
-              <AnimSection key={i} delay={i * 150}>
-                <div className="relative bg-patriot-dark-3 border border-white/5 rounded-2xl p-8 h-full">
-                  <div className="absolute top-6 right-6 text-6xl opacity-10 font-oswald font-bold">"</div>
-                  <div className="text-4xl mb-6">{s.i}</div>
-                  <p className="text-white/80 text-lg leading-relaxed italic mb-6">«{s.q}»</p>
-                  <div className="text-patriot-gold text-sm font-semibold uppercase tracking-wider">{s.t}</div>
-                </div>
-              </AnimSection>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* FORM */}
-      <section id="form" className="py-24 bg-patriot-dark-2 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_rgba(200,16,46,0.1)_0%,_transparent_60%)]" />
-        <div className="max-w-3xl mx-auto px-6 relative">
-          <AnimSection className="text-center mb-12">
-            <div className="inline-block text-xs font-semibold text-patriot-gold uppercase tracking-widest mb-4 border border-patriot-gold/30 px-4 py-1.5 rounded-full">
-              Форма участия
-            </div>
-            <h2 className="font-oswald text-4xl lg:text-5xl font-bold text-white mb-4">
-              Выберите формат<br />
-              <span className="text-gradient-gold">участия</span>
-            </h2>
-            <p className="text-white/50">Свяжемся в течение рабочего дня</p>
-          </AnimSection>
-
-          {submitted ? (
-            <AnimSection>
-              <div className="bg-patriot-dark-3 border border-patriot-gold/30 rounded-2xl p-12 text-center">
-                <div className="text-5xl mb-4">🎖</div>
-                <h3 className="font-oswald text-2xl font-bold text-white mb-2">Заявка отправлена!</h3>
-                <p className="text-white/50">Свяжемся с вами в течение рабочего дня. Спасибо!</p>
+              <div key={i}>
+                <span className="p-sbar-num">{s.n}</span>
+                <span className="p-sbar-label">{s.l}</span>
               </div>
-            </AnimSection>
-          ) : (
-            <AnimSection>
-              <form onSubmit={handleSubmit} className="bg-patriot-dark-3 border border-white/5 rounded-2xl p-8 space-y-5">
-                <div className="grid sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-xs text-white/50 uppercase tracking-wider mb-2">Имя</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ваше имя"
-                      value={formData.name}
-                      onChange={e => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full bg-patriot-dark-4 border border-white/10 focus:border-patriot-red/50 rounded-xl px-4 py-3 text-white placeholder-white/20 outline-none transition-colors text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/50 uppercase tracking-wider mb-2">Телефон или @vk</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="+7 или @username"
-                      value={formData.contact}
-                      onChange={e => setFormData({ ...formData, contact: e.target.value })}
-                      className="w-full bg-patriot-dark-4 border border-white/10 focus:border-patriot-red/50 rounded-xl px-4 py-3 text-white placeholder-white/20 outline-none transition-colors text-sm"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-white/50 uppercase tracking-wider mb-2">Город Приморья</label>
-                  <input
-                    type="text"
-                    placeholder="Владивосток, Артём, Находка..."
-                    value={formData.city}
-                    onChange={e => setFormData({ ...formData, city: e.target.value })}
-                    className="w-full bg-patriot-dark-4 border border-white/10 focus:border-patriot-red/50 rounded-xl px-4 py-3 text-white placeholder-white/20 outline-none transition-colors text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-white/50 uppercase tracking-wider mb-2">Формат участия</label>
-                  <select
-                    value={formData.format}
-                    onChange={e => setFormData({ ...formData, format: e.target.value })}
-                    className="w-full bg-patriot-dark-4 border border-white/10 focus:border-patriot-red/50 rounded-xl px-4 py-3 text-white outline-none transition-colors text-sm appearance-none cursor-pointer"
-                  >
-                    <option value="" className="bg-patriot-dark-4">Выберите формат...</option>
-                    <option value="personal" className="bg-patriot-dark-4">Прийти лично</option>
-                    <option value="materials" className="bg-patriot-dark-4">Передать материалы</option>
-                    <option value="school" className="bg-patriot-dark-4">Школа / организация</option>
-                    <option value="info" className="bg-patriot-dark-4">Инфоподдержка</option>
-                    <option value="finance" className="bg-patriot-dark-4">Финансовая помощь</option>
-                    <option value="unsure" className="bg-patriot-dark-4">Не решил(а)</option>
-                  </select>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full bg-patriot-red hover:bg-patriot-red-dark text-white font-bold py-4 rounded-xl btn-glow transition-all duration-300 font-oswald text-lg tracking-wide"
-                >
-                  Отправить заявку
-                </button>
-                <p className="text-center text-white/30 text-xs flex items-center justify-center gap-1.5">
-                  <Icon name="Lock" size={12} />
-                  Контакты не передаются третьим лицам
-                </p>
-              </form>
-            </AnimSection>
-          )}
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── HOW WE WORK ── */}
+      <section className="p-section">
+        <div className="p-container">
+          <div className="p-section-header">
+            <span className="p-section-label navy">Как мы работаем</span>
+            <h2>Каждый проект — от задачи до публичного отчёта</h2>
+            <p>Прозрачная структура работы, которую может проверить любой желающий</p>
+          </div>
+          <div className="p-steps">
+            {[
+              { n: 1, t: "Определяем приоритеты", d: "Выбираем, кому нужна помощь больше всего: воспитательные программы, историческая память, поддержка ветеранов и их семей." },
+              { n: 2, t: "Привлекаем участников", d: "Волонтёры, школы, предприятия и организации Приморского края — рядом с нами те, кому небезразлично." },
+              { n: 3, t: "Реализуем вместе", d: "Уроки мужества, патриотические акции, гуманитарные мероприятия и культурные проекты по всему краю." },
+              { n: 4, t: "Публикуем отчёт", d: "Фото, видео, цифры — каждое мероприятие задокументировано и доступно в открытом доступе." },
+            ].map((s, i) => (
+              <div key={i} className="p-step">
+                <div className="p-step-num">{s.n}</div>
+                <h4>{s.t}</h4>
+                <p>{s.d}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* DONATE */}
-      <section className="py-24 bg-patriot-dark relative overflow-hidden">
-        <div className="max-w-5xl mx-auto px-6">
-          <AnimSection className="text-center mb-12">
-            <div className="inline-block text-xs font-semibold text-patriot-gold uppercase tracking-widest mb-4 border border-patriot-gold/30 px-4 py-1.5 rounded-full">
-              Поддержать финансово
-            </div>
-            <h2 className="font-oswald text-4xl lg:text-5xl font-bold text-white mb-4">
-              Финансовая поддержка<br />
-              <span className="text-gradient-gold">организации</span>
-            </h2>
-          </AnimSection>
-
-          <div className="grid md:grid-cols-3 gap-4 mb-10">
-            {[
-              { v: "100 ₽", d: "метр ткани для плетения" },
-              { v: "500 ₽", d: "тёплые вещи для посылки" },
-              { v: "1 000 ₽", d: "полная комплектация посылки" },
-            ].map((a, i) => (
-              <AnimSection key={i} delay={i * 100}>
-                <div className="bg-patriot-dark-3 border border-white/5 hover:border-patriot-gold/30 rounded-2xl p-6 text-center card-hover transition-all duration-300">
-                  <div className="font-oswald text-3xl font-bold text-gradient-gold mb-2">{a.v}</div>
-                  <div className="text-white/50 text-sm">{a.d}</div>
-                </div>
-              </AnimSection>
-            ))}
+      {/* ── DIRECTIONS ── */}
+      <section className="p-section-alt" id="directions">
+        <div className="p-container">
+          <div className="p-section-header">
+            <span className="p-section-label">Как вы можете помочь</span>
+            <h2>Выберите удобный формат участия</h2>
+            <p>Не нужен опыт и особые навыки — всему обучим на месте. Главное — желание.</p>
           </div>
+          <div className="p-cards-grid">
+            <div className="p-pcard">
+              <div className="p-pcard-icon">🙌</div>
+              <h3>Прийти лично — руки и время</h3>
+              <p>Плетение маскировочных изделий, упаковка гуманитарных посылок, помощь на мероприятиях и акциях по всему Приморскому краю. Приходите одни или с детьми — всему научим на месте, опыт не нужен.</p>
+              <div className="p-pcard-tags">
+                <span className="p-tag">Без опыта</span>
+                <span className="p-tag">С детьми</span>
+                <span className="p-tag">Весь край</span>
+              </div>
+              <a href="#form" className="p-btn p-btn-primary">Узнать ближайшую точку →</a>
+            </div>
+            <div className="p-pcard">
+              <div className="p-pcard-icon">📦</div>
+              <h3>Передать материалы и ресурсы</h3>
+              <p>Ткань, нити, тёплые вещи, продукты питания, транспорт — по актуальному списку нужд. Можно передать из любого города края. Расскажем, что сейчас нужно больше всего.</p>
+              <div className="p-pcard-tags">
+                <span className="p-tag">Из любого города</span>
+                <span className="p-tag">Актуальный список</span>
+              </div>
+              <a href="#form" className="p-btn p-btn-dark">Получить список нужд →</a>
+            </div>
+            <div className="p-pcard">
+              <div className="p-pcard-icon">🏫</div>
+              <h3>Школам, клубам и организациям</h3>
+              <p>Проведём урок мужества, патриотический турнир или совместный культурный проект. Полностью берём подготовку на себя. Бесплатно для образовательных учреждений Приморского края.</p>
+              <div className="p-pcard-tags">
+                <span className="p-tag">Бесплатно</span>
+                <span className="p-tag">Весь край</span>
+                <span className="p-tag">Любой возраст</span>
+              </div>
+              <a href="#form" className="p-btn p-btn-dark">Стать партнёром →</a>
+            </div>
+            <div className="p-pcard">
+              <div className="p-pcard-icon">📢</div>
+              <h3>Информационная поддержка</h3>
+              <p>Рассказывайте о наших акциях и привлекайте новых участников. Подходит для блогеров, телеграм-каналов, местных СМИ и активных жителей Приморья — даже небольшая аудитория имеет значение.</p>
+              <div className="p-pcard-tags">
+                <span className="p-tag">Удалённо</span>
+                <span className="p-tag">Любая аудитория</span>
+              </div>
+              <a href="#form" className="p-btn p-btn-dark">Стать инфопартнёром →</a>
+            </div>
+          </div>
+        </div>
+      </section>
 
-          <AnimSection>
-            <div className="bg-patriot-dark-3 border border-white/5 rounded-2xl p-8">
-              <h3 className="font-oswald text-xl font-bold text-white mb-6 text-center">Способы перевода</h3>
-              <div className="grid md:grid-cols-3 gap-4 mb-8">
-                {[
-                  { i: "💳", l: "Карта Сбербанк", v: "5228 6005 8695 8904" },
-                  { i: "📲", l: "СБП", v: "+7-908-451-53-85" },
-                  { i: "🏦", l: "Расчётный счёт", v: "Реквизиты в VK" },
-                ].map((m, i) => (
-                  <div key={i} className="bg-patriot-dark-4 rounded-xl p-4 text-center">
-                    <div className="text-2xl mb-2">{m.i}</div>
-                    <div className="text-white/40 text-xs uppercase tracking-wider mb-1">{m.l}</div>
-                    <div className="text-white font-semibold text-sm font-mono">{m.v}</div>
-                  </div>
+      {/* ── STORIES ── */}
+      <section className="p-section">
+        <div className="p-container">
+          <div className="p-section-header">
+            <span className="p-section-label gold">Живые истории</span>
+            <h2>Не лозунги — конкретные люди и события</h2>
+            <p>Жители Приморья, которые уже делают что-то важное рядом с вами</p>
+          </div>
+          <div className="p-stories-grid">
+            <div className="p-story-card">
+              <div className="p-story-img s1">🎖</div>
+              <div className="p-story-body">
+                <h4>Ветераны Приморья — вместе с молодёжью</h4>
+                <p>Регулярные встречи, где ветераны передают живую историю — не по учебнику, а лично. Студенты и школьники слушают, задают вопросы и остаются помогать.</p>
+                <div className="p-story-quote">«Когда слышишь это от живого человека — это совсем другое.»</div>
+              </div>
+            </div>
+            <div className="p-story-card">
+              <div className="p-story-img s2">🧵</div>
+              <div className="p-story-body">
+                <h4>Школьники за столами мастерской</h4>
+                <p>Ребята остаются после уроков, чтобы плести изделия и собирать посылки. За одним столом — ученики начальных классов, старшеклассники и пенсионеры.</p>
+                <div className="p-story-quote">«Я не знала, что умею что-то важное. Теперь знаю.»</div>
+              </div>
+            </div>
+            <div className="p-story-card">
+              <div className="p-story-img s3">❤️</div>
+              <div className="p-story-body">
+                <h4>Семьи военнослужащих — не одни</h4>
+                <p>Адресная поддержка семей тех, кто сейчас несёт службу. Гуманитарные посылки, психологическая поддержка, совместные мероприятия для детей.</p>
+                <div className="p-story-quote">«Знать, что тебя не забыли — это уже очень много.»</div>
+              </div>
+            </div>
+          </div>
+          <div className="p-trust-row">
+            <div className="p-trust-badge"><span>✅</span> Официальная НКО, ОГРН 1242500028583</div>
+            <div className="p-trust-badge"><span>📋</span> Открытые отчёты о каждом мероприятии</div>
+            <div className="p-trust-badge"><span>🗺</span> Работаем по всему Приморскому краю</div>
+            <div className="p-trust-badge"><span>🏫</span> Партнёры — школы, ветеранские организации, клубы</div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── DONATION ── */}
+      <section className="p-section-alt" id="donate">
+        <div className="p-container">
+          <div className="p-donation-inner">
+            <div className="p-donation-info">
+              <span className="p-section-label">Финансовая поддержка</span>
+              <h2>Помочь деятельности организации</h2>
+              <p>
+                АНО «ПАТРИОТ ДВ» — официально зарегистрированная некоммерческая организация.
+                Добровольные пожертвования направляются исключительно на уставную деятельность.
+              </p>
+              <div className="p-donation-amounts">
+                {["100 ₽", "300 ₽", "500 ₽", "1 000 ₽", "Своя"].map(a => (
+                  <button
+                    key={a}
+                    className={`p-amount-btn${activeAmount === a ? " active" : ""}`}
+                    onClick={() => setActiveAmount(a)}
+                  >
+                    {a}
+                  </button>
                 ))}
               </div>
-              <p className="text-white/30 text-xs text-center leading-relaxed">
-                Добровольное пожертвование на уставную деятельность АНО «ПАТРИОТ ДВ», ИНН 2502079223, ОГРН 1242500028583. НДС не облагается.
+              <p className="p-amount-desc">{AMOUNT_DESCS[activeAmount]}</p>
+              <p style={{ fontSize: "0.82rem", color: "var(--muted-c)" }}>
+                Финансовая отчётность публикуется в открытом доступе в соответствии с
+                требованиями Федерального закона «О некоммерческих организациях».
+                Жертвователь вправе получить подтверждение о принятии пожертвования.
               </p>
             </div>
-          </AnimSection>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="py-24 bg-patriot-dark-2">
-        <div className="max-w-3xl mx-auto px-6">
-          <AnimSection className="text-center mb-12">
-            <div className="inline-block text-xs font-semibold text-patriot-gold uppercase tracking-widest mb-4 border border-patriot-gold/30 px-4 py-1.5 rounded-full">
-              Вопросы и ответы
-            </div>
-            <h2 className="font-oswald text-4xl lg:text-5xl font-bold text-white">
-              Часто <span className="text-gradient-gold">спрашивают</span>
-            </h2>
-          </AnimSection>
-
-          <div className="space-y-3">
-            {faqs.map((f, i) => (
-              <AnimSection key={i} delay={i * 60}>
-                <div
-                  className="bg-patriot-dark-3 border border-white/5 hover:border-white/10 rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer"
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                >
-                  <div className="flex items-center justify-between px-6 py-5 gap-4">
-                    <h3 className="font-semibold text-white text-base">{f.q}</h3>
-                    <div className={`text-patriot-gold flex-shrink-0 transition-transform duration-300 ${openFaq === i ? "rotate-45" : ""}`}>
-                      <Icon name="Plus" size={18} />
-                    </div>
-                  </div>
-                  {openFaq === i && (
-                    <div className="px-6 pb-5 text-white/60 text-sm leading-relaxed border-t border-white/5 pt-4">
-                      {f.a}
-                    </div>
-                  )}
+            <div className="p-donation-card">
+              <h3>Выберите удобный способ перевода</h3>
+              <div className="p-pay-method">
+                <div className="p-pay-icon">💳</div>
+                <div>
+                  <div className="p-pay-label">Перевод по номеру карты</div>
+                  <div className="p-pay-value">5228 6005 8695 8904</div>
                 </div>
-              </AnimSection>
-            ))}
+                <CopyBtn text="5228600586958904" label="Копировать" />
+              </div>
+              <div className="p-pay-method">
+                <div className="p-pay-icon">📲</div>
+                <div>
+                  <div className="p-pay-label">СБП — по номеру телефона (любой банк)</div>
+                  <div className="p-pay-value">+7-908-451-53-85</div>
+                </div>
+                <CopyBtn text="+79084515385" label="Копировать" />
+              </div>
+              <div className="p-pay-method">
+                <div className="p-pay-icon">🏦</div>
+                <div>
+                  <div className="p-pay-label">Расчётный счёт организации</div>
+                  <div className="p-pay-value">Реквизиты — в VK</div>
+                </div>
+                <a href="https://vk.com/patriotdv" target="_blank" rel="noreferrer" className="p-copy-btn">
+                  Запросить →
+                </a>
+              </div>
+              <div className="p-payment-purpose">
+                <div className="p-pp-label">⚠️ Обязательное назначение платежа — скопируйте текст</div>
+                <div className="p-pp-text">{PURPOSE_TEXT}</div>
+                <CopyBtn text={PURPOSE_TEXT} label="📋 Скопировать назначение платежа" />
+              </div>
+              <div className="p-donation-trust">
+                🔒 Все поступившие средства учитываются в соответствии с требованиями
+                Федерального закона «О некоммерческих организациях».
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer id="footer" className="bg-patriot-dark border-t border-white/5 pt-16 pb-8">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-3 gap-12 mb-12">
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-patriot-red to-patriot-gold flex items-center justify-center text-sm font-bold font-oswald">ПДВ</div>
-                <span className="font-oswald font-bold text-xl tracking-wide">ПАТРИОТ ДВ</span>
-              </div>
-              <p className="text-white/40 text-sm leading-relaxed">
-                АНО содействия сохранению исторического наследия и патриотического воспитания «ПАТРИОТ ДВ»
+      {/* ── FAQ ── */}
+      <section className="p-section">
+        <div className="p-container">
+          <div className="p-section-header">
+            <span className="p-section-label navy">Частые вопросы</span>
+            <h2>Ответы на то, что волнует больше всего</h2>
+          </div>
+          <div className="p-faq-list">
+            {FAQS.map((f, i) => <FaqItem key={i} q={f.q} a={f.a} />)}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FINAL CTA ── */}
+      <section className="p-final-cta">
+        <div className="p-container">
+          <h2>Станьте частью живой истории Приморья</h2>
+          <p>
+            Не нужен опыт, много времени или особые навыки. Нужно только желание
+            сделать что-то важное рядом с теми, кто служит Отечеству.
+          </p>
+          <div className="p-btn-group" style={{ justifyContent: "center" }}>
+            <a href="#form" className="p-btn p-btn-primary">Заполнить заявку →</a>
+            <a href="#donate" className="p-btn p-btn-gold">Поддержать финансово</a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer className="p-footer">
+        <div className="p-container">
+          <div className="p-footer-inner">
+            <div className="p-footer-col">
+              <h5>АНО «ПАТРИОТ ДВ»</h5>
+              <p>Региональная некоммерческая организация Приморского края</p>
+              <p>ОГРН 1242500028583</p>
+              <p>ИНН 2502079223</p>
+              <p>г. Артём, Приморский край</p>
+            </div>
+            <div className="p-footer-col">
+              <h5>Деятельность</h5>
+              <p>Историческая и культурная память</p>
+              <p>Патриотическое воспитание</p>
+              <p>Волонтёрские мастерские</p>
+              <p>Поддержка семей военнослужащих</p>
+            </div>
+            <div className="p-footer-col">
+              <h5>Контакты и отчёты</h5>
+              <a href="https://vk.com/patriotdv" target="_blank" rel="noreferrer">
+                Сообщество ВКонтакте →
+              </a>
+              <p>Телефон: +7-908-451-53-85</p>
+              <p style={{ marginTop: "10px", fontSize: "0.72rem", color: "rgba(255,255,255,0.3)" }}>
+                Финансовая отчётность публикуется в открытом доступе в соответствии
+                с требованиями законодательства РФ.
               </p>
             </div>
-
-            <div>
-              <h4 className="font-oswald font-bold text-base text-white mb-4 uppercase tracking-wider">Контакты</h4>
-              <div className="space-y-3">
-                <a href="tel:+79084515385" className="flex items-center gap-3 text-white/60 hover:text-white text-sm transition-colors">
-                  <Icon name="Phone" size={14} className="text-patriot-gold" />
-                  +7-908-451-53-85
-                </a>
-                <a href="https://vk.com/patriotdv" target="_blank" rel="noreferrer" className="flex items-center gap-3 text-white/60 hover:text-white text-sm transition-colors">
-                  <Icon name="Globe" size={14} className="text-patriot-gold" />
-                  vk.com/patriotdv
-                </a>
-                <div className="flex items-center gap-3 text-white/60 text-sm">
-                  <Icon name="MapPin" size={14} className="text-patriot-gold" />
-                  г. Артём, Приморский край
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-oswald font-bold text-base text-white mb-4 uppercase tracking-wider">Реквизиты</h4>
-              <div className="space-y-2 text-sm text-white/40">
-                <div>ОГРН: 1242500028583</div>
-                <div>ИНН: 2502079223</div>
-                <div className="pt-2 text-xs leading-relaxed">Отчётность по ФЗ «О некоммерческих организациях»</div>
-              </div>
-            </div>
           </div>
-
-          <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-white/20 text-xs">© 2024–2026 АНО «ПАТРИОТ ДВ». Все права защищены.</p>
-            <div className="flex gap-6">
-              {navLinks.map(nl => (
-                <a key={nl.l} href={nl.to} className="text-white/30 hover:text-white/60 text-xs transition-colors">
-                  {nl.l}
-                </a>
-              ))}
-            </div>
+          <div className="p-footer-bottom">
+            © 2024–2026 АНО содействия сохранению исторического наследия и патриотического воспитания «ПАТРИОТ ДВ» ·
+            Все права защищены
           </div>
         </div>
       </footer>
-    </div>
+
+      {/* ── STICKY MOBILE CTA ── */}
+      <a href="#form" className="p-sticky-cta">Хочу участвовать →</a>
+    </>
   );
 }
